@@ -1,18 +1,29 @@
 OpenChatRoom 🌌
+
 A modern, real-time chat application with a stunning "Aurora Glass" frontend and a scalable FastAPI backend. Built for seamless guest access, instant messaging, and a delightful user experience.
+
 ✨ Features
 
 Guest-Friendly Login: No passwords or emails needed—just enter your name to start chatting.
+
 Real-Time Messaging: Powered by WebSockets and Redis Pub/Sub for instant message delivery.
+
 Public & Private Rooms: Create public rooms for anyone or private rooms with invite-only links.
+
 Invitation Links: Generate personal links to restore your session on new devices (expires in 24 hours).
+
 Aesthetic Frontend: Glassmorphic UI with neon glows, smooth animations, and a cosmic aurora background, built with React, Tailwind CSS, and Framer Motion.
+
 Scalable Backend: FastAPI with SQLAlchemy, PostgreSQL, and Redis ensures performance and reliability.
+
 Interactive Features:
 
 Pulsing unread message indicators.
+
 Bouncing typing indicators.
+
 Collapsible member panels.
+
 Room deletion for owners.
 
 
@@ -28,17 +39,24 @@ Axios
 Backend:
 
 FastAPI
+
 SQLAlchemy (with asyncpg)
+
 PostgreSQL
+
 Redis
+
 Python (itsdangerous for secure tokens)
 
 📦 Setup Instructions
 Prerequisites
 
 Node.js (for frontend): Download from nodejs.org.
+
 Python 3.8+ (for backend): Download from python.org.
+
 PostgreSQL: Install and set up a local database.
+
 Redis: Install and run a Redis server.
 
 Backend Setup
