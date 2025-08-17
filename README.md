@@ -44,48 +44,65 @@ Redis: Install and run a Redis server.
 Backend Setup
 
 Clone the repository:
+
 bashgit clone [your-repo-link]
+
 cd openchatroom
 
 Create a virtual environment and install dependencies:
+
 bashpython -m venv venv
+
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 pip install -r requirements.txt
 
+
 Copy .env.example to .env and fill in your details:
-plaintextDATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/chatdb
+
+plaintextDATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/yourdb
+
 REDIS_URL=redis://localhost:6379
+
 SESSION_SECRET_KEY=your-super-secret-random-key-here
 
 Start the backend server:
+
 bashuvicorn main:app --reload
 
 
 Frontend Setup
 
 Navigate to the frontend directory:
+
 bashcd chat-frontend
 
 Install dependencies:
+
 bashnpm install
 
 Start the frontend server:
+
 bashnpm run dev
 
-
 Database Initialization
+
 The backend automatically creates the necessary tables on startup. Ensure your PostgreSQL database is running and accessible.
+
 🚀 Usage
 
 Open the frontend in your browser (e.g., http://localhost:5173).
 Enter a name to log in.
 Create or join rooms from the "My Feed" or "Public Feed" tabs.
+
 Chat in real-time, generate invitation links, or delete rooms you own.
+
 Open the invitation link in a new device to restore your session.
 
-📸 Screenshots
-(Add screenshots of your app here once available)
 🤝 Contributing
+
 Contributions are welcome! Please open an issue or submit a pull request with your ideas or improvements.
+
 📜 License
+
 This project is licensed under the MIT License.
