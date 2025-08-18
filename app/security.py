@@ -1,9 +1,8 @@
 import secrets
 from itsdangerous import URLSafeTimedSerializer
 from app.settings import settings
-from typing import Optional # <-- This line was missing
+from typing import Optional 
 
-# For generating the personal join link token
 serializer = URLSafeTimedSerializer(settings.SESSION_SECRET_KEY)
 
 def create_session_id() -> str:
@@ -14,7 +13,6 @@ def create_join_token(user_id: int) -> str:
 
 def verify_join_token(token: str) -> Optional[int]:
     try:
-        # Token expires after 1 day
         user_id = serializer.loads(token, max_age=86400)
         return user_id
     except Exception:

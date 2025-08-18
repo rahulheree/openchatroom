@@ -6,7 +6,6 @@ from typing import List, Dict, Set
 from .settings import settings
 from . import schemas
 
-# Manages active WebSocket connections on a single server instance
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, Set[WebSocket]] = {}
@@ -28,7 +27,6 @@ class ConnectionManager:
             for connection in self.active_connections[room_id]:
                 await connection.send_text(message)
 
-# Manages Redis connections and Pub/Sub logic
 class RedisManager:
     def __init__(self):
         self.redis_conn = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -61,6 +59,5 @@ class RedisManager:
     async def get_total_active_users(self) -> int:
         return await self.redis_conn.scard("global:active_users")
 
-# Create singleton instances
 connection_manager = ConnectionManager()
 redis_manager = RedisManager()

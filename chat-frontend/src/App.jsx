@@ -2,15 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
-// --- API Client Setup ---
-// --- THIS IS THE FIX ---
-// Changed 127.0.0.1 to localhost to ensure the browser sends the cookie correctly.
 const apiClient = axios.create({
   baseURL: 'http://localhost:8000/api/v1',
   withCredentials: true,
 });
 
-// --- Reusable Components ---
 const AuroraBackground = () => (
   <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
     <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl opacity-20 animate-blob"></div>
@@ -79,7 +75,6 @@ const LoginScreen = ({ onLogin }) => {
   );
 };
 
-// --- Create Room Modal Component ---
 const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
     const [roomName, setRoomName] = useState('');
     const [isPublic, setIsPublic] = useState(true);
@@ -92,8 +87,8 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
         }
         try {
             await apiClient.post('/rooms', { name: roomName, is_public: isPublic });
-            onRoomCreated(); // Notify parent to refetch rooms
-            onClose(); // Close the modal
+            onRoomCreated(); 
+            onClose(); 
         } catch (err) {
             console.error("Failed to create room:", err);
             setError('Could not create room.');
@@ -139,8 +134,6 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
     );
 };
 
-
-// --- Main Chat Interface Component ---
 const ChatInterface = ({ user, onLogout }) => {
   const [myRooms, setMyRooms] = useState([]);
   const [publicRooms, setPublicRooms] = useState([]);
@@ -245,7 +238,7 @@ const ChatInterface = ({ user, onLogout }) => {
         transition={{ duration: 0.8 }}
         className="w-full flex-1 p-4 flex gap-4 overflow-hidden"
       >
-        {/* Column 1: Left Sidebar */}
+
         <div className="w-1/4 h-full bg-black/30 backdrop-blur-xl rounded-2xl border border-white/10 p-4 flex flex-col">
           <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10">
             <div>
@@ -281,7 +274,6 @@ const ChatInterface = ({ user, onLogout }) => {
           <motion.button onClick={() => setCreateModalOpen(true)} whileHover={{ scale: 1.05 }} className="mt-4 w-full py-2 font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg">+</motion.button>
         </div>
 
-        {/* Column 2: Center Chat Window */}
         <div className="w-1/2 h-full bg-black/20 backdrop-blur-lg rounded-2xl border border-white/10 p-4 flex flex-col">
           {selectedRoom ? (
             <>
@@ -324,7 +316,6 @@ const ChatInterface = ({ user, onLogout }) => {
           )}
         </div>
 
-        {/* Column 3: Right Room Info */}
         <div className="w-1/4 h-full bg-black/30 backdrop-blur-xl rounded-2xl border border-white/10 p-4">
           {selectedRoom ? (
             <>
@@ -350,8 +341,6 @@ const ChatInterface = ({ user, onLogout }) => {
   );
 };
 
-
-// --- Main App Component ---
 function App() {
   const [user, setUser] = useState(null);
 

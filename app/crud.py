@@ -5,7 +5,6 @@ from . import models, schemas
 import datetime
 from typing import List, Optional
 
-# --- User CRUD ---
 async def get_user(db: AsyncSession, user_id: int) -> Optional[models.User]:
     result = await db.execute(select(models.User).filter(models.User.id == user_id))
     return result.scalars().first()
@@ -21,9 +20,8 @@ async def create_user(db: AsyncSession, user: schemas.UserCreate) -> models.User
     await db.refresh(db_user)
     return db_user
 
-# --- Session CRUD ---
 async def create_session(db: AsyncSession, user_id: int, session_id: str) -> models.Session:
-    # Expire sessions in 30 days
+    
     expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
     db_session = models.Session(id=session_id, user_id=user_id, expires_at=expires_at)
     db.add(db_session)
@@ -40,15 +38,13 @@ async def get_user_by_session_id(db: AsyncSession, session_id: str) -> Optional[
     session = result.scalars().first()
     return session.user if session else None
 
-# --- Room CRUD ---
 async def create_room(db: AsyncSession, room: schemas.RoomCreate, owner_id: int) -> models.Room:
     db_room = models.Room(**room.dict(), owner_id=owner_id)
     db.add(db_room)
     await db.commit()
     await db.refresh(db_room)
-    # The owner is automatically a member
     await add_user_to_room(db, room_id=db_room.id, user_id=owner_id)
-    await db.refresh(db_room) # Refresh again to load the new member relationship
+    await db.refresh(db_room) 
     return db_room
 
 async def get_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
@@ -89,14 +85,13 @@ async def delete_room(db: AsyncSession, room_id: int) -> Optional[models.Room]:
         await db.commit()
     return db_room
 
-# --- Membership CRUD ---
 async def add_user_to_room(db: AsyncSession, room_id: int, user_id: int) -> Optional[models.RoomMember]:
-    # Check if user is already a member to prevent duplicates
+    
     result = await db.execute(
         select(models.RoomMember).filter_by(room_id=room_id, user_id=user_id)
     )
     if result.scalars().first():
-        return None  # Already a member
+        return None  
 
     db_membership = models.RoomMember(room_id=room_id, user_id=user_id)
     db.add(db_membership)
@@ -121,7 +116,6 @@ async def get_room_member(db: AsyncSession, room_id: int, user_id: int) -> Optio
     return result.scalars().first()
 
 
-# --- Message CRUD ---
 async def create_message(db: AsyncSession, message: schemas.MessageCreate, room_id: int, user_id: int) -> models.Message:
     db_message = models.Message(**message.dict(), room_id=room_id, user_id=user_id)
     db.add(db_message)
