@@ -1,11 +1,17 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, status, Response, WebSocket, WebSocketDisconnect, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+import uuid
+import os
+import shutil
 from . import crud, schemas, models, security, services
 from .deps import get_db, get_current_user
 
 router = APIRouter()
+
+UPLOAD_DIR = "uploaded_files"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/session/start", response_model=schemas.User)
 async def start_session(response: Response, user_in: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
@@ -25,36 +31,51 @@ async def start_session(response: Response, user_in: schemas.UserCreate, db: Asy
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@router.get("/session/join")
-async def restore_session(token: str, response: Response, db: AsyncSession = Depends(get_db)):
-    user_id = security.verify_join_token(token)
-    if not user_id or not await crud.get_user(db, user_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
-
-    session_id = security.create_session_id()
-    await crud.create_session(db, user_id=user_id, session_id=session_id)
-    
-    response.set_cookie(key="session_id", value=session_id, httponly=True, secure=False, samesite="lax")
-    return {"status": "session restored"}
-
 @router.post("/rooms", response_model=schemas.Room, status_code=status.HTTP_201_CREATED)
 async def create_room(
     room: schemas.RoomCreate,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await crud.create_room(db=db, room=room, owner_id=current_user.id)
+    return await crud.create_room(db=db, room=room, current_user=current_user)
 
-@router.get("/rooms/public", response_model=List[schemas.Room])
-async def list_public_rooms(db: AsyncSession = Depends(get_db)):
-    return await crud.get_public_rooms(db)
+@router.get("/rooms/community", response_model=List[schemas.PublicRoomFeedItem])
+async def list_community_rooms(db: AsyncSession = Depends(get_db)):
+    rooms = await crud.get_community_rooms(db)
+    feed = []
+    for room in rooms:
+        active_users = await services.redis_manager.get_active_users_in_room(room.id)
+        feed.append(schemas.PublicRoomFeedItem(**room.__dict__, active_users=active_users))
+    return feed
 
-@router.get("/rooms/my", response_model=List[schemas.Room])
+@router.get("/rooms/userspaces", response_model=List[schemas.PublicRoomFeedItem])
+async def list_userspace_rooms(db: AsyncSession = Depends(get_db)):
+    rooms = await crud.get_userspace_rooms(db)
+    feed = []
+    for room in rooms:
+        active_users = await services.redis_manager.get_active_users_in_room(room.id)
+        feed.append(schemas.PublicRoomFeedItem(**room.__dict__, active_users=active_users))
+    return feed
+
+@router.get("/rooms/my", response_model=List[schemas.MyRoomFeedItem])
 async def list_my_rooms(
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    return await crud.get_user_rooms(db, user_id=current_user.id)
+    rooms = await crud.get_user_rooms(db, user_id=current_user.id)
+    feed = []
+    for room in rooms:
+        active_users = await services.redis_manager.get_active_users_in_room(room.id)
+        member_info = await crud.get_room_member(db, room_id=room.id, user_id=current_user.id)
+        unread_count = member_info.unread_count if member_info else 0
+        feed.append(
+            schemas.MyRoomFeedItem(
+                **room.__dict__,
+                active_users=active_users,
+                unread_count=unread_count
+            )
+        )
+    return feed
 
 @router.get("/rooms/{room_id}", response_model=schemas.RoomDetails)
 async def get_room_details(room_id: int, db: AsyncSession = Depends(get_db)):
@@ -119,51 +140,6 @@ async def get_room_messages(
 ):
     return await crud.get_messages_for_room(db, room_id=room_id, skip=skip, limit=limit)
 
-@router.get("/feed/public", response_model=List[schemas.PublicRoomFeedItem])
-async def get_public_feed(db: AsyncSession = Depends(get_db)):
-    rooms = await crud.get_public_rooms(db)
-    feed = []
-    for room in rooms:
-        active_users = await services.redis_manager.get_active_users_in_room(room.id)
-        feed.append(schemas.PublicRoomFeedItem(**room.__dict__, active_users=active_users))
-    return feed
-
-@router.get("/feed/my", response_model=List[schemas.MyRoomFeedItem])
-async def get_my_feed(
-    current_user: models.User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    rooms = await crud.get_user_rooms(db, user_id=current_user.id)
-    feed = []
-    for room in rooms:
-        active_users = await services.redis_manager.get_active_users_in_room(room.id)
-        member_info = await crud.get_room_member(db, room_id=room.id, user_id=current_user.id)
-        unread_count = member_info.unread_count if member_info else 0
-        feed.append(
-            schemas.MyRoomFeedItem(
-                **room.__dict__,
-                active_users=active_users,
-                unread_count=unread_count
-            )
-        )
-    return feed
-
-@router.get("/stats/public")
-async def get_public_stats():
-    total_users = await services.redis_manager.get_total_active_users()
-    return {"total_online_users": total_users}
-
-@router.get("/rooms/{room_id}/stats", response_model=schemas.RoomStats)
-async def get_room_stats(
-    room_id: int,
-    current_user: models.User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    active_users = await services.redis_manager.get_active_users_in_room(room_id)
-    member_info = await crud.get_room_member(db, room_id=room_id, user_id=current_user.id)
-    unread_count = member_info.unread_count if member_info else 0
-    return {"active_users": active_users, "unread_count": unread_count}
-
 @router.websocket("/ws/{room_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -179,6 +155,11 @@ async def websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    membership = await crud.get_room_member(db, room_id, user.id)
+    if not membership:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User not a member of this room")
+        return
+
     await services.connection_manager.connect(websocket, room_id)
     await services.redis_manager.add_active_user(room_id, user.id)
     
@@ -189,9 +170,16 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
-            message_schema = schemas.MessageCreate(content=data)
-            db_message = await crud.create_message(db, message=message_schema, room_id=room_id, user_id=user.id)
+            message_data = schemas.MessageCreate.model_validate_json(data)
+            
+            db_message = await crud.create_message(
+                db, 
+                message=message_data, 
+                room_id=room_id, 
+                user_id=user.id
+            )
             await db.refresh(db_message, attribute_names=['author'])
+            
             await services.redis_manager.publish_message(room_id, schemas.Message.from_orm(db_message))
 
     except WebSocketDisconnect:
@@ -199,3 +187,48 @@ async def websocket_endpoint(
         await services.redis_manager.remove_active_user(room_id, user.id)
         if not redis_listener_task.done():
             redis_listener_task.cancel()
+
+@router.post("/upload-file")
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user)
+):
+    if not file:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    
+    unique_filename = f"{uuid.uuid4()}-{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    file_url = f"/uploaded_files/{unique_filename}"
+    
+    return {"file_url": file_url}
+
+@router.post("/rooms/{room_id}/invite", response_model=schemas.RoomInvite)
+async def generate_invite_link(
+    room_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    room = await crud.get_room(db, room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    if room.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only room owners can create invite links")
+        
+    invite = await crud.create_room_invite(db, room_id)
+    return invite
+
+@router.get("/invite/{token}", response_model=schemas.Room)
+async def get_room_by_invite(
+    token: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    room = await crud.get_room_by_invite_token_with_owner(db, token)
+    if not room:
+        raise HTTPException(status_code=404, detail="Invalid invite token")
+
+    return room
+
